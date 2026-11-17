@@ -93,7 +93,8 @@
     .edge-hit:hover + .edge-line { stroke:#c4b5fd; stroke-width:3.3; }
     .edge-hit.selected + .edge-line { stroke:#fb9ce1; stroke-width:3.3; }
     .edge-line.selected { stroke:#fb9ce1; stroke-width:3.3; }
-    .node-layer { position:absolute; inset:0; }
+    .node-layer { position:absolute; inset:0; pointer-events:none; }
+    .node { pointer-events:auto; }
     .node {
       position:absolute; width:176px; min-height:76px; transform:translate(-50%,-50%); cursor:grab; user-select:none;
       border-radius:13px; border:1px solid rgba(139,155,188,.23); background:linear-gradient(145deg,#1b2333,#141a27);
@@ -313,6 +314,18 @@
     .distance-card { border-color:rgba(169,148,255,.18);background:linear-gradient(145deg,rgba(169,148,255,.085),rgba(101,228,208,.025)); }
     .small-action { border-radius:11px;background:#111927; }
     .modal { border-radius:20px;background:linear-gradient(145deg,#171e2d,#0d121d); }
+    .confirm-modal { width:min(420px,100%); }
+    .confirm-symbol { width:38px;height:38px;display:grid;place-items:center;margin-bottom:14px;border-radius:12px;color:#ffb2bd;background:rgba(251,113,133,.11);border:1px solid rgba(251,113,133,.2);font-size:18px; }
+    .confirm-modal p { margin-bottom:20px; }
+    .modal-actions .confirm-danger { border:0;background:linear-gradient(115deg,#fb8b9a,#d95e7e);color:#210d15; }
+    .node { min-height:70px;padding:14px 15px;gap:0; }
+    .node-content { display:flex;flex-direction:column;align-items:flex-start;gap:7px;padding-right:7px;min-width:0; }
+    .node-name { font-size:13px;font-weight:780;line-height:1.25;letter-spacing:-.12px;overflow-wrap:anywhere;color:#f0f2fa; }
+    .node-handshakes { display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:7px;background:rgba(169,148,255,.10);border:1px solid rgba(169,148,255,.12);font-size:10px;line-height:1;color:#c9bbff;font-weight:700;white-space:nowrap; }
+    .node.main .node-handshakes { color:#8cebdc;background:rgba(101,228,208,.09);border-color:rgba(101,228,208,.16); }
+    .node.unreachable .node-handshakes { color:#929db2;background:rgba(137,153,185,.08);border-color:rgba(137,153,185,.10); }
+    .edge-hit { cursor:pointer; }
+    .canvas-help { max-width:calc(100% - 100px);line-height:1.5; }
     .toast { border-radius:12px;background:#151e2c; }
     @media (max-width:420px) { .node { width:166px; } }
 
@@ -368,7 +381,7 @@
       <div class="hint-card">
         <div class="hint-icon">✳</div>
         <div class="hint-title">Как это работает</div>
-        <div class="hint-text">Потяни круглую точку справа на карточке к другому человеку. На телефоне можно нажать на точку, а затем на нужную карточку. MatildaNet найдёт кратчайшую цепочку до главного.</div>
+        <div class="hint-text">ПКМ по пустому месту поля — добавить человека. Потяни точку на карточке к другому человеку, чтобы создать связь. Нажми на линию, чтобы удалить её.</div>
       </div>
     </aside>
 
@@ -385,9 +398,9 @@
       <div class="empty-tip" id="emptyTip">
         <div class="spark">⌘</div>
         <strong>Твоя сеть начинается здесь</strong>
-        <span>Добавь людей, а затем потяни круглую точку справа на карточке к другому человеку. На телефоне нажми на точку, затем на нужную карточку.</span>
+        <span>ПКМ по пустому месту поля добавляет человека. Потяни точку на карточке к другому человеку, чтобы соединить их.</span>
       </div>
-      <div class="canvas-help">Тяни за точку на карточке, чтобы создать связь · Перетаскивай карточки для перемещения · Колесо — масштаб</div>
+      <div class="canvas-help">Точка на карточке — создать связь · ЛКМ по линии — удалить · ПКМ по полю — добавить человека · Колесо — масштаб</div>
       <div class="canvas-controls">
         <button id="zoomOut" aria-label="Уменьшить">−</button><div class="zoom-value" id="zoomValue">100%</div><button id="zoomIn" aria-label="Увеличить">+</button><button id="fitBtn" aria-label="Подогнать схему">⌗</button>
       </div>
@@ -412,6 +425,17 @@
     <div class="modal-actions"><button type="button" id="cancelAdd">Отмена</button><button class="confirm" type="submit">Добавить</button></div>
   </form>
 </div>
+<div class="modal-backdrop" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+  <div class="modal confirm-modal">
+    <div class="confirm-symbol">!</div>
+    <h2 id="confirmTitle">Подтвердите действие</h2>
+    <p id="confirmMessage"></p>
+    <div class="modal-actions">
+      <button type="button" id="confirmCancel">Отмена</button>
+      <button type="button" class="confirm-danger" id="confirmAccept">Удалить</button>
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -425,6 +449,7 @@
   let connectMode = false, connectFrom = null;
   let pan = {x:0,y:0}, zoom = 1;
   let drag = null, panDrag = null, linkDrag = null, toastTimer;
+  let confirmResolver = null, pendingAddPosition = null;
 
   const makeId = () => 'p_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-3);
   const defaultGraph = () => ({
@@ -460,6 +485,26 @@
   function toast(message) {
     const el = $('toast'); el.textContent = message; el.classList.add('show');
     clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 2400);
+  }
+  function askConfirm(title, message, actionLabel = 'Удалить') {
+    $('confirmTitle').textContent = title;
+    $('confirmMessage').textContent = message;
+    $('confirmAccept').textContent = actionLabel;
+    $('confirmModal').classList.add('open');
+    requestAnimationFrame(() => $('confirmCancel').focus());
+    return new Promise(resolve => { confirmResolver = resolve; });
+  }
+  function finishConfirm(result) {
+    $('confirmModal').classList.remove('open');
+    const resolve = confirmResolver;
+    confirmResolver = null;
+    if (resolve) resolve(result);
+  }
+  function openAddModal(position = null) {
+    pendingAddPosition = position;
+    $('addModal').classList.add('open');
+    $('personName').value = '';
+    setTimeout(() => $('personName').focus(), 50);
   }
   function nodeById(id) { return graph.nodes.find(n => n.id === id); }
   function edgeById(id) { return graph.edges.find(e => e.id === id); }
@@ -523,13 +568,11 @@
       el.className = 'node' + (isRoot?' main':'') + (n.id===selectedNodeId?' selected':'') + (pathNodes.has(n.id)?' path-node':'') + (connectFrom===n.id?' connect-start':'');
       el.dataset.id = n.id;
       el.style.left = n.x + 'px'; el.style.top = n.y + 'px';
-      const chip = isRoot ? 'ОСНОВНОЙ' : distance === null ? 'НЕТ СВЯЗИ' : `${distance} ${distance===1?'РУКОПОЖАТИЕ':distance>=2&&distance<=4?'РУКОПОЖАТИЯ':'РУКОПОЖАТИЙ'}`;
-      const info = isRoot ? 'Начало твоей сети' : distance === null ? 'Пока не связан с главным' : `До главного: ${distance}`;
-      el.innerHTML = `<div class="node-top"><div class="node-avatar"></div><div class="node-chip"></div></div><div class="node-name"></div><div class="node-distance"></div><button class="node-port" type="button" aria-label="Соединить с другим человеком" title="Потяни к другому человеку или нажми, затем выбери его"></button>`;
-      el.querySelector('.node-avatar').textContent = nameInitial(n.name);
-      el.querySelector('.node-chip').textContent = chip;
+      const countText = distance === null ? 'Нет пути' : `${distance} ${distance===1?'рукопожатие':distance>=2&&distance<=4?'рукопожатия':'рукопожатий'}`;
+      if (distance === null) el.classList.add('unreachable');
+      el.innerHTML = `<div class="node-content"><div class="node-name"></div><div class="node-handshakes"></div></div><button class="node-port" type="button" aria-label="Соединить с другим человеком" title="Потяни к другому человеку или нажми, затем выбери его"></button>`;
       el.querySelector('.node-name').textContent = n.name;
-      el.querySelector('.node-distance').textContent = info;
+      el.querySelector('.node-handshakes').textContent = countText;
       el.addEventListener('pointerdown', (event) => onNodePointerDown(event,n.id));
       el.querySelector('.node-port').addEventListener('pointerdown', event => startLinkDrag(event,n.id));
       el.addEventListener('keydown', (event) => { if (event.key==='Enter' || event.key===' ') { event.preventDefault(); selectNode(n.id); } });
@@ -544,7 +587,9 @@
       const d = `M ${a.x} ${a.y} C ${a.x+dx*.36+curve} ${a.y+dy*.32}, ${a.x+dx*.64+curve} ${a.y+dy*.68}, ${b.x} ${b.y}`;
       const hit = document.createElementNS('http://www.w3.org/2000/svg','path');
       hit.setAttribute('d',d); hit.setAttribute('class','edge-hit'+(e.id===selectedEdgeId?' selected':''));
-      hit.addEventListener('pointerdown',event=>{ event.stopPropagation(); selectEdge(e.id); });
+      hit.setAttribute('role','button');
+      hit.setAttribute('aria-label',`Удалить связь ${a.name} — ${b.name}`);
+      hit.addEventListener('pointerdown',event=>{ if(event.button!==0)return;event.preventDefault();event.stopPropagation();deleteEdge(e.id); });
       const line = document.createElementNS('http://www.w3.org/2000/svg','path');
       line.setAttribute('d',d); line.setAttribute('class','edge-line'+(pathEdges.has(e.id)?' path':'')+(e.id===selectedEdgeId?' selected':''));
       edgeLayer.append(hit,line);
@@ -591,6 +636,16 @@
   function escapeHTML(value) { return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function selectNode(id) { selectedNodeId=id;selectedEdgeId=null;renderGraph(); }
   function selectEdge(id) { selectedEdgeId=id;selectedNodeId=null;renderGraph(); }
+  function deleteEdge(id) {
+    const edge = edgeById(id);
+    if (!edge) return;
+    const a = nodeById(edge.a), b = nodeById(edge.b);
+    graph.edges = graph.edges.filter(item => item.id !== id);
+    if (selectedEdgeId === id) selectedEdgeId = null;
+    saveGraph();
+    renderGraph();
+    toast(`Связь ${a?.name || 'человека'} — ${b?.name || 'человека'} удалена`);
+  }
   function onNodePointerDown(event,id) {
     event.stopPropagation();
     if (event.button !== 0) return;
@@ -646,18 +701,24 @@
       : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="m8.2 8.2 7.6 7.6"/></svg> Соединить людей';
     $('connectBanner').textContent=connectFrom ? `Выбран: ${nodeById(connectFrom)?.name || 'человек'} · выбери второго` : 'Выбери первого человека для связи';
   }
-  function addNode(name) {
+  function addNode(name, position = null) {
     const rect=canvas.getBoundingClientRect();
-    let x=(rect.width/2-pan.x)/zoom, y=(rect.height/2-pan.y)/zoom;
-    const angle=graph.nodes.length*2.399, radius=145+Math.sqrt(graph.nodes.length)*34;
-    x += Math.cos(angle)*radius; y += Math.sin(angle)*radius;
+    let x, y;
+    if (position && Number.isFinite(position.x) && Number.isFinite(position.y)) {
+      x = position.x; y = position.y;
+    } else {
+      x=(rect.width/2-pan.x)/zoom; y=(rect.height/2-pan.y)/zoom;
+      const angle=graph.nodes.length*2.399, radius=145+Math.sqrt(graph.nodes.length)*34;
+      x += Math.cos(angle)*radius; y += Math.sin(angle)*radius;
+    }
     x=Math.max(100,Math.min(WORLD_W-100,x)); y=Math.max(100,Math.min(WORLD_H-100,y));
     const node={id:makeId(),name:name.trim(),x,y}; graph.nodes.push(node);selectedNodeId=node.id;selectedEdgeId=null;
-    saveGraph();renderGraph();centerOn(node);toast('Человек добавлен');
+    saveGraph();renderGraph();if(!position)centerOn(node);toast('Человек добавлен');
   }
-  function deleteNode(id) {
+  async function deleteNode(id) {
     const n=nodeById(id); if (!n) return;
-    if (!confirm(`Удалить «${n.name}» и все его связи?`)) return;
+    const accepted = await askConfirm('Удалить человека?', `Удалить «${n.name}» и все его связи? Это действие нельзя отменить.`, 'Удалить');
+    if (!accepted || !nodeById(id)) return;
     graph.nodes=graph.nodes.filter(x=>x.id!==id);graph.edges=graph.edges.filter(e=>e.a!==id&&e.b!==id);
     if (graph.rootId===id) graph.rootId=graph.nodes[0]?.id || null;
     if (!graph.nodes.length) { graph=defaultGraph(); }
@@ -713,10 +774,13 @@
 
   $('graphTitle').value=graph.title;
   $('graphTitle').addEventListener('change',e=>{graph.title=e.target.value.trim()||'Моя сеть рукопожатий';e.target.value=graph.title;saveGraph();});
-  $('addNodeBtn').addEventListener('click',()=>{ $('addModal').classList.add('open');$('personName').value='';setTimeout(()=>$('personName').focus(),50); });
-  $('cancelAdd').addEventListener('click',()=> $('addModal').classList.remove('open'));
-  $('addModal').addEventListener('pointerdown',e=>{if(e.target===$('addModal'))$('addModal').classList.remove('open');});
-  $('addForm').addEventListener('submit',e=>{e.preventDefault();const name=$('personName').value.trim();if(!name)return;$('addModal').classList.remove('open');addNode(name);});
+  $('addNodeBtn').addEventListener('click',()=>openAddModal());
+  $('cancelAdd').addEventListener('click',()=>{ $('addModal').classList.remove('open');pendingAddPosition=null; });
+  $('addModal').addEventListener('pointerdown',e=>{if(e.target===$('addModal')){ $('addModal').classList.remove('open');pendingAddPosition=null; }});
+  $('addForm').addEventListener('submit',e=>{e.preventDefault();const name=$('personName').value.trim();if(!name)return;const position=pendingAddPosition;pendingAddPosition=null;$('addModal').classList.remove('open');addNode(name,position);});
+  $('confirmCancel').addEventListener('click',()=>finishConfirm(false));
+  $('confirmAccept').addEventListener('click',()=>finishConfirm(true));
+  $('confirmModal').addEventListener('pointerdown',e=>{if(e.target===$('confirmModal'))finishConfirm(false);});
   $('connectBtn').addEventListener('click',()=>{connectMode=!connectMode;connectFrom=null;selectedEdgeId=null;updateConnectUI();renderGraph();if(connectMode)toast('Нажми на двух людей по очереди или потяни точку на карточке');});
   $('centerBtn').addEventListener('click',fitGraph);
   $('fitBtn').addEventListener('click',fitGraph);
@@ -725,9 +789,17 @@
   $('exportBtn').addEventListener('click',exportJSON);
   $('importBtn').addEventListener('click',()=>$('importFile').click());
   $('importFile').addEventListener('change',e=>{if(e.target.files[0])importJSON(e.target.files[0]);e.target.value='';});
-  $('resetBtn').addEventListener('click',()=>{if(!confirm('Удалить текущую сеть и начать заново?'))return;graph=defaultGraph();selectedNodeId=null;selectedEdgeId=null;connectMode=false;connectFrom=null;$('graphTitle').value=graph.title;saveGraph();updateConnectUI();renderGraph();fitGraph();toast('Создана новая сеть');});
+  $('resetBtn').addEventListener('click',async()=>{const accepted=await askConfirm('Очистить сеть?', 'Все добавленные люди и связи будут удалены. Начнётся новая пустая сеть.', 'Очистить');if(!accepted)return;graph=defaultGraph();selectedNodeId=null;selectedEdgeId=null;connectMode=false;connectFrom=null;$('graphTitle').value=graph.title;saveGraph();updateConnectUI();renderGraph();fitGraph();toast('Создана новая сеть');});
   $('searchInput').addEventListener('keydown',e=>{if(e.key==='Enter'){findPerson(e.target.value);e.target.blur();}});
 
+  canvas.addEventListener('contextmenu',event=>{
+    if (event.target.closest('.node') || event.target.closest('.edge-hit') || event.target.closest('.canvas-controls')) return;
+    event.preventDefault();
+    if (connectMode) { connectMode=false;connectFrom=null;updateConnectUI();renderGraph(); }
+    const rect=canvas.getBoundingClientRect();
+    const position={x:(event.clientX-rect.left-pan.x)/zoom,y:(event.clientY-rect.top-pan.y)/zoom};
+    openAddModal(position);
+  });
   canvas.addEventListener('pointerdown',event=>{
     if (event.target.closest('.node') || event.target.closest('.edge-hit') || event.target.closest('.canvas-controls')) return;
     if (connectMode) { connectMode=false;connectFrom=null;updateConnectUI();renderGraph();return; }
@@ -763,7 +835,7 @@
   function drawEdgesOnly() {
     const path=selectedNodeId?shortestPath(selectedNodeId):null;const pathEdges=new Set(path?path.edges:[]);
     edgeLayer.innerHTML='';
-    for(const e of graph.edges){const a=nodeById(e.a),b=nodeById(e.b);if(!a||!b)continue;const dx=b.x-a.x,dy=b.y-a.y,curve=Math.min(38,Math.max(-38,dx*.08));const d=`M ${a.x} ${a.y} C ${a.x+dx*.36+curve} ${a.y+dy*.32}, ${a.x+dx*.64+curve} ${a.y+dy*.68}, ${b.x} ${b.y}`;const hit=document.createElementNS('http://www.w3.org/2000/svg','path');hit.setAttribute('d',d);hit.setAttribute('class','edge-hit'+(e.id===selectedEdgeId?' selected':''));hit.addEventListener('pointerdown',ev=>{ev.stopPropagation();selectEdge(e.id);});const line=document.createElementNS('http://www.w3.org/2000/svg','path');line.setAttribute('d',d);line.setAttribute('class','edge-line'+(pathEdges.has(e.id)?' path':'')+(e.id===selectedEdgeId?' selected':''));edgeLayer.append(hit,line);}
+    for(const e of graph.edges){const a=nodeById(e.a),b=nodeById(e.b);if(!a||!b)continue;const dx=b.x-a.x,dy=b.y-a.y,curve=Math.min(38,Math.max(-38,dx*.08));const d=`M ${a.x} ${a.y} C ${a.x+dx*.36+curve} ${a.y+dy*.32}, ${a.x+dx*.64+curve} ${a.y+dy*.68}, ${b.x} ${b.y}`;const hit=document.createElementNS('http://www.w3.org/2000/svg','path');hit.setAttribute('d',d);hit.setAttribute('class','edge-hit'+(e.id===selectedEdgeId?' selected':''));hit.setAttribute('role','button');hit.setAttribute('aria-label',`Удалить связь ${a.name} — ${b.name}`);hit.addEventListener('pointerdown',ev=>{if(ev.button!==0)return;ev.preventDefault();ev.stopPropagation();deleteEdge(e.id);});const line=document.createElementNS('http://www.w3.org/2000/svg','path');line.setAttribute('d',d);line.setAttribute('class','edge-line'+(pathEdges.has(e.id)?' path':'')+(e.id===selectedEdgeId?' selected':''));edgeLayer.append(hit,line);}
     if(linkDrag && linkDrag.moved){
       const a=nodeById(linkDrag.from);const rect=canvas.getBoundingClientRect();
       if(a){const x=(linkDrag.x-rect.left-pan.x)/zoom,y=(linkDrag.y-rect.top-pan.y)/zoom;
@@ -777,7 +849,7 @@
   }
   canvas.addEventListener('wheel',event=>{event.preventDefault();const rect=canvas.getBoundingClientRect();setZoom(zoom*(event.deltaY<0?1.1:1/1.1),event.clientX-rect.left,event.clientY-rect.top);},{passive:false});
   window.addEventListener('keydown',event=>{
-    if(event.key==='Escape'){if(linkDrag){linkDrag=null;drawEdgesOnly();}if(connectMode){connectMode=false;connectFrom=null;updateConnectUI();renderGraph();}else $('addModal').classList.remove('open');}
+    if(event.key==='Escape'){if($('confirmModal').classList.contains('open')){finishConfirm(false);return;}if(linkDrag){linkDrag=null;drawEdgesOnly();}if(connectMode){connectMode=false;connectFrom=null;updateConnectUI();renderGraph();}else if($('addModal').classList.contains('open')){ $('addModal').classList.remove('open');pendingAddPosition=null; }}
     const active=document.activeElement;const typing=active&&(active.tagName==='INPUT'||active.tagName==='TEXTAREA');
     if(!typing&&(event.key==='Delete'||event.key==='Backspace')){if(selectedNodeId)deleteNode(selectedNodeId);else if(selectedEdgeId){graph.edges=graph.edges.filter(e=>e.id!==selectedEdgeId);selectedEdgeId=null;saveGraph();renderGraph();}}
     if(!typing&&(event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='s'){event.preventDefault();saveGraph();toast('Сеть сохранена в браузере');}
