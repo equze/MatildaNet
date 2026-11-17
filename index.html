@@ -1,0 +1,785 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b0d14" />
+  <title>MatildaNet — карта рукопожатий</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0d14;
+      --panel: #111521;
+      --panel-2: #151b29;
+      --panel-3: #1a2232;
+      --line: rgba(160, 177, 211, .12);
+      --line-strong: rgba(160, 177, 211, .22);
+      --text: #edf1fb;
+      --muted: #8994aa;
+      --muted-2: #667189;
+      --accent: #a78bfa;
+      --accent-2: #6ee7d2;
+      --danger: #fb7185;
+      --success: #6ee7b7;
+      --shadow: 0 18px 50px rgba(0,0,0,.35);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { width:100%; height:100%; margin:0; overflow:hidden; background:var(--bg); color:var(--text); }
+    button, input { font:inherit; }
+    button { color:inherit; }
+    .app { height:100%; display:flex; flex-direction:column; min-width:320px; }
+    .topbar {
+      height:68px; flex:none; display:flex; align-items:center; gap:18px; padding:0 22px;
+      background:rgba(13,16,25,.94); border-bottom:1px solid var(--line); z-index:5;
+    }
+    .brand { display:flex; align-items:center; gap:11px; min-width:225px; }
+    .brand-mark {
+      width:34px; height:34px; border-radius:11px; display:grid; place-items:center;
+      background:linear-gradient(140deg, #b59cff, #6edfd2); color:#101320; font-weight:950; font-size:18px;
+      box-shadow:0 5px 22px rgba(167,139,250,.23);
+    }
+    .brand-name { font-weight:850; letter-spacing:-.7px; font-size:17px; }
+    .brand-sub { color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:1.5px; margin-top:2px; }
+    .graph-title-wrap { min-width:150px; max-width:260px; }
+    .graph-title {
+      width:100%; border:0; outline:0; color:var(--text); font-size:13px; font-weight:650;
+      background:transparent; padding:8px 9px; border-radius:8px;
+    }
+    .graph-title:hover, .graph-title:focus { background:var(--panel-3); }
+    .top-spacer { flex:1; }
+    .search-wrap { position:relative; width:min(270px, 23vw); }
+    .search-wrap svg { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none; }
+    .search {
+      width:100%; height:36px; border:1px solid var(--line); outline:0; border-radius:10px;
+      background:#111622; color:var(--text); padding:0 12px 0 36px; font-size:12px;
+    }
+    .search:focus { border-color:rgba(167,139,250,.6); box-shadow:0 0 0 3px rgba(167,139,250,.1); }
+    .save-state { display:flex; align-items:center; gap:7px; color:var(--muted); font-size:11px; white-space:nowrap; }
+    .save-dot { width:7px; height:7px; border-radius:50%; background:var(--success); box-shadow:0 0 10px rgba(110,231,183,.5); }
+    .workspace { flex:1; min-height:0; display:grid; grid-template-columns:230px minmax(0,1fr) 286px; }
+    .sidebar { background:var(--panel); min-height:0; overflow:auto; position:relative; z-index:2; }
+    .leftbar { border-right:1px solid var(--line); padding:21px 15px; }
+    .rightbar { border-left:1px solid var(--line); padding:21px 17px; }
+    .section-label { color:var(--muted-2); font-size:9px; font-weight:800; letter-spacing:1.7px; text-transform:uppercase; margin:2px 8px 12px; }
+    .tool-button {
+      width:100%; min-height:42px; border:1px solid transparent; border-radius:10px; background:transparent;
+      display:flex; align-items:center; gap:11px; padding:0 11px; text-align:left; cursor:pointer;
+      color:#cbd3e3; font-size:12px; font-weight:620; transition:.16s ease; margin:3px 0;
+    }
+    .tool-button svg { color:#9ba7bf; flex:none; }
+    .tool-button:hover { background:var(--panel-3); color:white; }
+    .tool-button.primary { color:#171322; background:linear-gradient(115deg,#b69bff,#8dcbeb); border:0; box-shadow:0 7px 20px rgba(167,139,250,.13); }
+    .tool-button.primary svg { color:#272039; }
+    .tool-button.primary:hover { filter:brightness(1.08); transform:translateY(-1px); }
+    .tool-button.active { background:rgba(167,139,250,.13); border-color:rgba(167,139,250,.26); color:#d8ccff; }
+    .tool-button.active svg { color:var(--accent); }
+    .tool-button.danger { color:#fda4af; }
+    .tool-button.danger svg { color:#fb7185; }
+    .tool-divider { height:1px; background:var(--line); margin:17px 7px; }
+    .hint-card { margin:22px 2px 0; padding:13px 12px; border-radius:12px; background:linear-gradient(145deg,rgba(167,139,250,.10),rgba(110,231,210,.045)); border:1px solid rgba(167,139,250,.14); }
+    .hint-icon { color:var(--accent); font-size:15px; margin-bottom:7px; }
+    .hint-title { font-size:11px; font-weight:750; margin-bottom:5px; }
+    .hint-text { color:var(--muted); font-size:10px; line-height:1.55; }
+    .canvas-area { min-width:0; min-height:0; position:relative; overflow:hidden; background-color:#0d1019;
+      background-image:radial-gradient(rgba(142,157,190,.19) .8px, transparent .8px); background-size:24px 24px; }
+    .canvas-area.connecting { cursor:crosshair; }
+    .canvas-area.panning { cursor:grabbing; }
+    .stage { position:absolute; left:0; top:0; width:4000px; height:3000px; transform-origin:0 0; will-change:transform; }
+    .edge-layer { position:absolute; inset:0; width:4000px; height:3000px; overflow:visible; }
+    .edge-line { fill:none; stroke:rgba(141,157,190,.5); stroke-width:2.2; pointer-events:none; transition:stroke .15s, stroke-width .15s; }
+    .edge-line.path { stroke:#a78bfa; stroke-width:3.3; filter:drop-shadow(0 0 5px rgba(167,139,250,.45)); }
+    .edge-hit { fill:none; stroke:transparent; stroke-width:20; cursor:pointer; pointer-events:stroke; }
+    .edge-hit:hover + .edge-line { stroke:#c4b5fd; stroke-width:3.3; }
+    .edge-hit.selected + .edge-line { stroke:#fb9ce1; stroke-width:3.3; }
+    .edge-line.selected { stroke:#fb9ce1; stroke-width:3.3; }
+    .node-layer { position:absolute; inset:0; }
+    .node {
+      position:absolute; width:176px; min-height:76px; transform:translate(-50%,-50%); cursor:grab; user-select:none;
+      border-radius:13px; border:1px solid rgba(139,155,188,.23); background:linear-gradient(145deg,#1b2333,#141a27);
+      box-shadow:0 9px 24px rgba(0,0,0,.28); padding:12px 13px 10px; display:flex; flex-direction:column; gap:7px;
+      transition:border-color .15s, box-shadow .15s, background .15s;
+    }
+    .node:active { cursor:grabbing; }
+    .node:hover { border-color:rgba(167,139,250,.62); box-shadow:0 10px 28px rgba(0,0,0,.4),0 0 0 2px rgba(167,139,250,.08); }
+    .node.selected { border-color:#b69bff; box-shadow:0 0 0 3px rgba(167,139,250,.16),0 12px 30px rgba(0,0,0,.4); background:linear-gradient(145deg,#25243b,#171c2b); }
+    .node.main { border-color:rgba(110,231,210,.75); background:linear-gradient(145deg,#173333,#14252b); box-shadow:0 0 0 2px rgba(110,231,210,.09),0 10px 28px rgba(0,0,0,.3); }
+    .node.path-node:not(.main) { border-color:rgba(167,139,250,.8); }
+    .node.connect-start { border-color:#6ee7d2; box-shadow:0 0 0 4px rgba(110,231,210,.18); }
+    .node-top { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .node-avatar { width:22px; height:22px; border-radius:7px; display:grid; place-items:center; font-size:10px; font-weight:850; color:#1a1930; background:linear-gradient(140deg,#c4b5fd,#80dacf); flex:none; }
+    .node.main .node-avatar { background:linear-gradient(140deg,#a6f4e5,#63d9c5); color:#0c2726; }
+    .node-chip { font-size:8px; font-weight:800; letter-spacing:.75px; color:#9ca8bf; text-transform:uppercase; white-space:nowrap; }
+    .node.main .node-chip { color:#83e8d6; }
+    .node-name { font-size:12px; font-weight:750; line-height:1.2; overflow-wrap:anywhere; color:#f0f2fa; }
+    .node-distance { font-size:9px; color:#8e9ab1; }
+    .node.path-node .node-distance { color:#c6b5ff; }
+    .node.main .node-distance { color:#7be3d0; }
+    .empty-tip { position:absolute; left:50%; top:calc(50% + 118px); transform:translate(-50%,-50%); width:min(340px,80%); text-align:center; pointer-events:none; opacity:.78; }
+    .empty-tip .spark { margin:0 auto 13px; width:42px;height:42px;border:1px solid rgba(167,139,250,.35);border-radius:14px;display:grid;place-items:center;color:var(--accent);font-size:20px;background:rgba(167,139,250,.08); }
+    .empty-tip strong { display:block;font-size:13px;margin-bottom:7px; }
+    .empty-tip span { color:var(--muted);font-size:11px;line-height:1.6; }
+    .canvas-status { position:absolute; left:17px; top:16px; display:flex; align-items:center; gap:8px; pointer-events:none; }
+    .status-pill { padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:rgba(15,19,30,.86); color:#aeb9ce; font-size:10px; box-shadow:0 4px 15px rgba(0,0,0,.15); backdrop-filter:blur(8px); }
+    .status-pill strong { color:#eff1fb; font-weight:750; }
+    .connect-banner { position:absolute; top:16px; left:50%; transform:translateX(-50%); border:1px solid rgba(110,231,210,.35); color:#baf7ec; background:rgba(20,54,53,.9); border-radius:10px; padding:9px 14px; font-size:11px; box-shadow:var(--shadow); display:none; white-space:nowrap; pointer-events:none; }
+    .connecting .connect-banner { display:block; }
+    .canvas-controls { position:absolute; right:17px; bottom:17px; display:flex; gap:5px; padding:5px; border:1px solid var(--line); border-radius:11px; background:rgba(17,21,33,.92); box-shadow:var(--shadow); }
+    .canvas-controls button { width:30px;height:30px;border:0;border-radius:7px;background:transparent;color:#b4bfd3;cursor:pointer;font-size:16px; }
+    .canvas-controls button:hover { background:var(--panel-3);color:white; }
+    .zoom-value { min-width:44px;display:grid;place-items:center;color:var(--muted);font-size:10px; }
+    .canvas-help { position:absolute; left:17px; bottom:19px; color:#667189; font-size:9px; pointer-events:none; }
+    .panel-heading { font-size:11px; font-weight:800; letter-spacing:1.3px; text-transform:uppercase; color:#aeb8cc; margin:1px 0 17px; }
+    .empty-inspector { text-align:center; padding:29px 10px; color:var(--muted); }
+    .empty-inspector .target { width:42px;height:42px;margin:0 auto 12px;display:grid;place-items:center;border:1px solid var(--line-strong);border-radius:13px;color:#8995ad;font-size:19px; }
+    .empty-inspector strong { display:block;color:#c9d0df;font-size:12px;margin-bottom:6px; }
+    .empty-inspector p { font-size:10px;line-height:1.55;margin:0; }
+    .person-head { display:flex;align-items:center;gap:11px;margin:0 0 17px; }
+    .person-avatar { width:42px;height:42px;border-radius:13px;display:grid;place-items:center;background:linear-gradient(145deg,#bba7ff,#76dccc);color:#171628;font-size:17px;font-weight:900; }
+    .person-title { min-width:0; }
+    .person-title strong { display:block;font-size:13px;line-height:1.25;overflow-wrap:anywhere; }
+    .person-title span { display:block;margin-top:4px;color:var(--muted);font-size:9px; }
+    .field-label { display:block;color:var(--muted);font-size:9px;font-weight:750;letter-spacing:1px;text-transform:uppercase;margin:14px 0 7px; }
+    .field-input { width:100%;height:37px;border:1px solid var(--line-strong);border-radius:9px;background:#0e131e;color:var(--text);padding:0 10px;outline:0;font-size:11px; }
+    .field-input:focus { border-color:rgba(167,139,250,.6);box-shadow:0 0 0 3px rgba(167,139,250,.09); }
+    .distance-card { border:1px solid rgba(167,139,250,.2);background:linear-gradient(145deg,rgba(167,139,250,.10),rgba(110,231,210,.035));border-radius:12px;padding:13px;margin-top:18px; }
+    .distance-caption { color:#a9b3c8;font-size:9px;text-transform:uppercase;letter-spacing:1.1px;font-weight:800; }
+    .distance-number { display:flex;align-items:baseline;gap:7px;margin-top:6px; }
+    .distance-number strong { font-size:31px;letter-spacing:-1.5px;color:#d7c9ff;line-height:1; }
+    .distance-number span { font-size:10px;color:#a9b3c8; }
+    .distance-note { font-size:9px;color:var(--muted);margin-top:8px;line-height:1.45; }
+    .path-box { margin-top:14px; }
+    .path-title { color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:1px;font-weight:750;margin-bottom:8px; }
+    .path-list { display:flex;flex-direction:column;gap:0; }
+    .path-step { display:flex;align-items:center;gap:9px;min-height:31px;font-size:10px;color:#c8d0df; }
+    .path-step:not(:last-child)::after { content:""; }
+    .step-num { width:17px;height:17px;border-radius:6px;display:grid;place-items:center;background:#22283a;color:#aeb8cb;font-size:8px;flex:none; }
+    .path-step:last-child .step-num { background:rgba(110,231,210,.15);color:#8cebdc; }
+    .path-step span:last-child { overflow-wrap:anywhere; }
+    .path-arrow { color:#64718b;font-size:9px;padding-left:4px;height:11px;line-height:11px; }
+    .inspector-actions { display:flex;flex-direction:column;gap:7px;margin-top:19px; }
+    .small-action { height:35px;border:1px solid var(--line-strong);border-radius:9px;background:#171e2c;color:#cdd5e5;font-size:10px;font-weight:700;cursor:pointer; }
+    .small-action:hover { background:#202a3c;border-color:rgba(167,139,250,.4); }
+    .small-action.main-action { color:#9cf0df;border-color:rgba(110,231,210,.23);background:rgba(110,231,210,.07); }
+    .small-action.delete-action { color:#fda4af;border-color:rgba(251,113,133,.18);background:rgba(251,113,133,.055); }
+    .edge-info { font-size:11px;line-height:1.6;color:#aab5ca;padding:12px;border:1px solid var(--line);border-radius:10px;background:#151b29; }
+    .stats-grid { display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:20px; }
+    .stat-box { padding:11px 10px;border:1px solid var(--line);border-radius:10px;background:#141a27; }
+    .stat-box strong { display:block;font-size:19px;letter-spacing:-.5px;color:#e9eafa; }
+    .stat-box span { color:var(--muted);font-size:9px;margin-top:3px;display:block; }
+    .modal-backdrop { position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(3,5,10,.72);backdrop-filter:blur(7px); }
+    .modal-backdrop.open { display:flex; }
+    .modal { width:min(390px,100%);border:1px solid var(--line-strong);border-radius:17px;background:linear-gradient(145deg,#1a2030,#111622);padding:21px;box-shadow:0 25px 80px rgba(0,0,0,.55); }
+    .modal h2 { margin:0;font-size:17px;letter-spacing:-.4px; }
+    .modal p { margin:7px 0 17px;color:var(--muted);font-size:11px;line-height:1.5; }
+    .modal input { width:100%;height:42px;border:1px solid var(--line-strong);border-radius:10px;background:#0c111b;color:white;padding:0 12px;outline:0;font-size:12px; }
+    .modal input:focus { border-color:var(--accent); }
+    .modal-actions { display:flex;justify-content:flex-end;gap:8px;margin-top:17px; }
+    .modal-actions button { height:35px;padding:0 13px;border-radius:9px;border:1px solid var(--line-strong);background:#1c2433;color:#bdc7d8;font-size:10px;font-weight:700;cursor:pointer; }
+    .modal-actions .confirm { border:0;background:linear-gradient(115deg,#b69bff,#8dcbeb);color:#171322; }
+    .toast { position:fixed;z-index:30;left:50%;bottom:25px;transform:translate(-50%,15px);padding:10px 15px;border:1px solid var(--line-strong);border-radius:10px;background:#1b2434;color:#dce3f2;font-size:11px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:.22s; }
+    .toast.show { opacity:1;transform:translate(-50%,0); }
+    .hidden { display:none !important; }
+    @media (max-width:1050px) {
+      .workspace { grid-template-columns:190px minmax(0,1fr) 250px; }
+      .brand { min-width:185px; }
+      .leftbar { padding-left:11px;padding-right:11px; }
+      .rightbar { padding-left:13px;padding-right:13px; }
+    }
+    @media (max-width:760px) {
+      html,body { overflow:hidden; }
+      .topbar { height:58px;padding:0 12px;gap:9px; }
+      .brand { min-width:0; }
+      .brand-mark { width:31px;height:31px; }
+      .brand-sub { display:none; }
+      .brand-name { font-size:15px; }
+      .graph-title-wrap { display:none; }
+      .search-wrap { width:min(180px,34vw);margin-left:auto; }
+      .save-state { font-size:0;gap:0; }
+      .save-dot { width:8px;height:8px; }
+      .workspace { display:flex;flex-direction:column; }
+      .leftbar { flex:none;display:flex;align-items:center;gap:5px;overflow-x:auto;overflow-y:hidden;padding:8px 10px;border-right:0;border-bottom:1px solid var(--line); }
+      .leftbar .section-label,.leftbar .tool-divider,.leftbar .hint-card { display:none; }
+      .tool-button { width:auto;min-width:max-content;min-height:35px;margin:0;padding:0 10px;font-size:10px;gap:7px; }
+      .tool-button svg { width:14px;height:14px; }
+      .canvas-area { flex:1;min-height:300px; }
+      .rightbar { flex:none;max-height:32vh;min-height:125px;overflow:auto;border-left:0;border-top:1px solid var(--line);padding:12px 15px; }
+      .panel-heading { margin-bottom:10px;font-size:10px; }
+      .empty-inspector { padding:10px;display:flex;align-items:center;gap:10px;text-align:left; }
+      .empty-inspector .target { margin:0;flex:none;width:34px;height:34px; }
+      .empty-inspector p { display:none; }
+      .empty-inspector strong { margin:0; }
+      .person-head { margin-bottom:10px; }
+      .distance-card { margin-top:10px;padding:10px; }
+      .distance-number strong { font-size:25px; }
+      .path-box { margin-top:10px; }
+      .inspector-actions { margin-top:10px;flex-direction:row;flex-wrap:wrap; }
+      .small-action { flex:1;min-width:105px; }
+      .stats-grid { display:none; }
+      .canvas-help { display:none; }
+      .canvas-status { left:9px;top:9px; }
+      .status-pill { padding:6px 8px;font-size:9px; }
+      .canvas-controls { right:9px;bottom:9px; }
+      .connect-banner { top:9px;font-size:9px;padding:8px 10px;max-width:70%;overflow:hidden;text-overflow:ellipsis; }
+    }
+    @media (max-width:420px) {
+      .search-wrap { width:125px; }
+      .node { width:158px; }
+    }
+
+    /* MatildaNet refresh: deeper surfaces, softer cards and clearer connections */
+    :root {
+      --bg:#070910; --panel:#0b0f18; --panel-2:#101624; --panel-3:#151e2d;
+      --line:rgba(157,174,207,.095); --line-strong:rgba(157,174,207,.18);
+      --text:#f1f4fb; --muted:#8591a8; --muted-2:#5e6b83;
+      --accent:#a994ff; --accent-2:#65e4d0;
+      --shadow:0 22px 65px rgba(0,0,0,.48);
+    }
+    html,body { background:#070910; }
+    .topbar {
+      background:rgba(8,11,18,.97); border-bottom-color:rgba(157,174,207,.09);
+      box-shadow:0 8px 28px rgba(0,0,0,.16);
+    }
+    .brand-mark { border-radius:12px; box-shadow:0 6px 26px rgba(167,139,250,.2); }
+    .brand-name { letter-spacing:-.8px; }
+    .search { background:#0b101a; border-color:rgba(157,174,207,.13); }
+    .workspace { background:#090c14; }
+    .sidebar { background:#0b0f18; }
+    .leftbar { border-right-color:rgba(157,174,207,.085); }
+    .rightbar { border-left-color:rgba(157,174,207,.085); }
+    .tool-button { border-radius:12px; min-height:43px; }
+    .tool-button.primary { background:linear-gradient(115deg,#b6a5ff,#83d9d7); box-shadow:0 8px 24px rgba(141,126,225,.16); }
+    .tool-button.active { background:rgba(101,228,208,.1); border-color:rgba(101,228,208,.24); color:#a7f2e5; }
+    .tool-button.active svg { color:#78e8d7; }
+    .canvas-area {
+      background-color:#080b13;
+      background-image:radial-gradient(rgba(137,153,185,.17) .75px, transparent .75px),
+        radial-gradient(ellipse at 50% 45%,rgba(65,75,112,.10),transparent 60%);
+      background-size:25px 25px,100% 100%;
+    }
+    .node {
+      width:190px; min-height:84px; border-radius:17px; padding:13px 15px 12px;
+      gap:8px; border:1px solid rgba(160,177,211,.16);
+      background:linear-gradient(145deg,rgba(25,33,49,.98),rgba(15,21,33,.98));
+      box-shadow:0 13px 34px rgba(0,0,0,.37), inset 0 1px 0 rgba(255,255,255,.035);
+      backdrop-filter:blur(12px); touch-action:none;
+      transition:border-color .18s,box-shadow .18s,background .18s,transform .18s;
+    }
+    .node:hover {
+      border-color:rgba(169,148,255,.55);
+      box-shadow:0 16px 40px rgba(0,0,0,.48),0 0 0 3px rgba(169,148,255,.075),inset 0 1px 0 rgba(255,255,255,.05);
+    }
+    .node.selected {
+      border-color:rgba(185,168,255,.9);
+      background:linear-gradient(145deg,#24243b,#151b2b);
+      box-shadow:0 0 0 3px rgba(169,148,255,.16),0 17px 42px rgba(0,0,0,.48),inset 0 1px 0 rgba(255,255,255,.055);
+    }
+    .node.main {
+      border-color:rgba(101,228,208,.72);
+      background:linear-gradient(145deg,#153330,#101f27);
+      box-shadow:0 0 0 2px rgba(101,228,208,.10),0 15px 38px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.05);
+    }
+    .node.path-node:not(.main) { border-color:rgba(169,148,255,.78); }
+    .node.connect-start { border-color:#65e4d0; box-shadow:0 0 0 4px rgba(101,228,208,.19),0 16px 38px rgba(0,0,0,.4); }
+    .node.drop-target { border-color:#65e4d0!important; box-shadow:0 0 0 4px rgba(101,228,208,.2),0 18px 42px rgba(0,0,0,.5)!important; }
+    .node-avatar {
+      width:27px;height:27px;border-radius:9px;font-size:11px;
+      box-shadow:inset 0 1px 1px rgba(255,255,255,.22),0 3px 10px rgba(0,0,0,.18);
+    }
+    .node-name { font-size:13px; letter-spacing:-.15px; }
+    .node-chip { font-size:8px; letter-spacing:.9px; }
+    .node-distance { font-size:10px; }
+    .node-port {
+      position:absolute; z-index:2; right:-10px; top:50%; transform:translateY(-50%);
+      width:22px;height:22px;padding:0;appearance:none;border-radius:50%;display:grid;place-items:center;
+      border:1px solid rgba(101,228,208,.63);background:#0d2426;
+      box-shadow:0 0 0 4px rgba(101,228,208,.075),0 5px 14px rgba(0,0,0,.4);
+      cursor:crosshair;touch-action:none;transition:.16s ease;
+    }
+    .node-port::before { content:"";width:7px;height:7px;border-radius:50%;background:#78eddb;box-shadow:0 0 9px rgba(101,228,208,.6); }
+    .node-port:hover,.node-port:active { transform:translateY(-50%) scale(1.13);background:#16403f;border-color:#a0ffed;box-shadow:0 0 0 5px rgba(101,228,208,.12),0 5px 16px rgba(0,0,0,.45); }
+    .node.connect-start .node-port { background:#1b514a;border-color:#a0ffed; }
+    .edge-line { stroke:rgba(126,145,181,.48);stroke-width:2.3; }
+    .edge-line.path { stroke:#ae9aff;stroke-width:3.5;filter:drop-shadow(0 0 6px rgba(169,148,255,.4)); }
+    .edge-line.selected { stroke:#77e8d8;stroke-width:3.5; }
+    .edge-hit { stroke-width:22; }
+    .link-preview { fill:none;stroke:#72e8d8;stroke-width:2.6;stroke-dasharray:7 7;stroke-linecap:round;filter:drop-shadow(0 0 5px rgba(101,228,208,.38));pointer-events:none; }
+    .status-pill { border-radius:10px;background:rgba(10,14,23,.9);border-color:rgba(157,174,207,.12);backdrop-filter:blur(12px); }
+    .connect-banner { border-radius:12px;background:rgba(11,39,38,.95);border-color:rgba(101,228,208,.35);box-shadow:0 12px 32px rgba(0,0,0,.35); }
+    .canvas-controls { border-radius:13px;background:rgba(11,15,24,.94);backdrop-filter:blur(12px); }
+    .canvas-controls button { border-radius:9px; }
+    .person-avatar { border-radius:14px; }
+    .field-input,.modal input { background:#090e17;border-color:rgba(157,174,207,.17); }
+    .distance-card { border-color:rgba(169,148,255,.18);background:linear-gradient(145deg,rgba(169,148,255,.085),rgba(101,228,208,.025)); }
+    .small-action { border-radius:11px;background:#111927; }
+    .modal { border-radius:20px;background:linear-gradient(145deg,#171e2d,#0d121d); }
+    .toast { border-radius:12px;background:#151e2c; }
+    @media (max-width:420px) { .node { width:166px; } }
+
+  </style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">M</div>
+      <div><div class="brand-name">MatildaNet</div><div class="brand-sub">Handshake explorer</div></div>
+    </div>
+    <div class="graph-title-wrap"><input id="graphTitle" class="graph-title" value="Моя сеть рукопожатий" maxlength="48" aria-label="Название сети" /></div>
+    <div class="top-spacer"></div>
+    <div class="search-wrap">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
+      <input id="searchInput" class="search" placeholder="Найти человека..." autocomplete="off" />
+    </div>
+    <div class="save-state"><span class="save-dot"></span><span>Сохранено</span></div>
+  </header>
+
+  <main class="workspace">
+    <aside class="sidebar leftbar">
+      <div class="section-label">Работа с сетью</div>
+      <button class="tool-button primary" id="addNodeBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M12 5v14M5 12h14"/></svg>
+        Добавить человека
+      </button>
+      <button class="tool-button" id="connectBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="m8.2 8.2 7.6 7.6"/></svg>
+        Соединить людей
+      </button>
+      <button class="tool-button" id="centerBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 1v3m0 16v3M1 12h3m16 0h3"/></svg>
+        Показать всю сеть
+      </button>
+      <div class="tool-divider"></div>
+      <div class="section-label">Файл сети</div>
+      <button class="tool-button" id="exportBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m-5-5 5 5 5-5"/><path d="M5 17v3h14v-3"/></svg>
+        Экспортировать JSON
+      </button>
+      <button class="tool-button" id="importBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 16V4m-5 5 5-5 5 5"/><path d="M5 17v3h14v-3"/></svg>
+        Импортировать JSON
+      </button>
+      <input id="importFile" type="file" accept=".json,application/json" class="hidden" />
+      <div class="tool-divider"></div>
+      <button class="tool-button danger" id="resetBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6"/></svg>
+        Очистить сеть
+      </button>
+      <div class="hint-card">
+        <div class="hint-icon">✳</div>
+        <div class="hint-title">Как это работает</div>
+        <div class="hint-text">Потяни круглую точку справа на карточке к другому человеку. На телефоне можно нажать на точку, а затем на нужную карточку. MatildaNet найдёт кратчайшую цепочку до главного.</div>
+      </div>
+    </aside>
+
+    <section class="canvas-area" id="canvasArea" aria-label="Поле сети">
+      <div class="canvas-status">
+        <div class="status-pill"><strong id="nodeCount">1</strong> человек</div>
+        <div class="status-pill"><strong id="edgeCount">0</strong> связей</div>
+      </div>
+      <div class="connect-banner" id="connectBanner">Выбери первого человека для связи</div>
+      <div class="stage" id="stage">
+        <svg class="edge-layer" id="edgeLayer" viewBox="0 0 4000 3000" aria-label="Связи между людьми"></svg>
+        <div class="node-layer" id="nodeLayer"></div>
+      </div>
+      <div class="empty-tip" id="emptyTip">
+        <div class="spark">⌘</div>
+        <strong>Твоя сеть начинается здесь</strong>
+        <span>Добавь людей, а затем потяни круглую точку справа на карточке к другому человеку. На телефоне нажми на точку, затем на нужную карточку.</span>
+      </div>
+      <div class="canvas-help">Тяни за точку на карточке, чтобы создать связь · Перетаскивай карточки для перемещения · Колесо — масштаб</div>
+      <div class="canvas-controls">
+        <button id="zoomOut" aria-label="Уменьшить">−</button><div class="zoom-value" id="zoomValue">100%</div><button id="zoomIn" aria-label="Увеличить">+</button><button id="fitBtn" aria-label="Подогнать схему">⌗</button>
+      </div>
+    </section>
+
+    <aside class="sidebar rightbar">
+      <div class="panel-heading">Информация</div>
+      <div id="inspector"></div>
+      <div class="stats-grid">
+        <div class="stat-box"><strong id="reachableCount">1</strong><span>Связаны с главным</span></div>
+        <div class="stat-box"><strong id="maxDistance">0</strong><span>Максимум рукопожатий</span></div>
+      </div>
+    </aside>
+  </main>
+</div>
+
+<div class="modal-backdrop" id="addModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <form class="modal" id="addForm">
+    <h2 id="modalTitle">Новый человек</h2>
+    <p>Добавь участника в свою сеть рукопожатий.</p>
+    <input id="personName" maxlength="60" placeholder="Например, Алексей или известный человек" autocomplete="off" required />
+    <div class="modal-actions"><button type="button" id="cancelAdd">Отмена</button><button class="confirm" type="submit">Добавить</button></div>
+  </form>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  'use strict';
+  const STORAGE_KEY = 'matildanet_graph_v1';
+  const WORLD_W = 4000, WORLD_H = 3000;
+  const $ = (id) => document.getElementById(id);
+  const canvas = $('canvasArea'), stage = $('stage'), nodeLayer = $('nodeLayer'), edgeLayer = $('edgeLayer');
+  let graph, selectedNodeId = null, selectedEdgeId = null;
+  let connectMode = false, connectFrom = null;
+  let pan = {x:0,y:0}, zoom = 1;
+  let drag = null, panDrag = null, linkDrag = null, toastTimer;
+
+  const makeId = () => 'p_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-3);
+  const defaultGraph = () => ({
+    title: 'Моя сеть рукопожатий',
+    rootId: 'root',
+    nodes: [{id:'root', name:'Я', x:WORLD_W/2, y:WORLD_H/2}],
+    edges: []
+  });
+  function loadGraph() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return defaultGraph();
+      const data = JSON.parse(raw);
+      if (!data || !Array.isArray(data.nodes) || !Array.isArray(data.edges)) return defaultGraph();
+      const nodes = data.nodes.filter(n => n && typeof n.id === 'string' && typeof n.name === 'string' && Number.isFinite(n.x) && Number.isFinite(n.y));
+      const ids = new Set(nodes.map(n => n.id));
+      const edges = data.edges.filter(e => e && ids.has(e.a) && ids.has(e.b) && e.a !== e.b).map(e => ({id:String(e.id || makeId()),a:e.a,b:e.b}));
+      if (!nodes.length) return defaultGraph();
+      const rootId = ids.has(data.rootId) ? data.rootId : nodes[0].id;
+      return {title:typeof data.title === 'string' ? data.title : 'Моя сеть рукопожатий',rootId,nodes,edges};
+    } catch { return defaultGraph(); }
+  }
+  graph = loadGraph();
+
+  function saveGraph() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(graph));
+      document.querySelector('.save-state span:last-child').textContent = 'Сохранено';
+    } catch {
+      document.querySelector('.save-state span:last-child').textContent = 'Не сохранено';
+    }
+  }
+  function toast(message) {
+    const el = $('toast'); el.textContent = message; el.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 2400);
+  }
+  function nodeById(id) { return graph.nodes.find(n => n.id === id); }
+  function edgeById(id) { return graph.edges.find(e => e.id === id); }
+  function adjacency() {
+    const map = new Map(graph.nodes.map(n => [n.id, []]));
+    for (const e of graph.edges) {
+      if (map.has(e.a) && map.has(e.b)) { map.get(e.a).push({id:e.id,to:e.b}); map.get(e.b).push({id:e.id,to:e.a}); }
+    }
+    return map;
+  }
+  function shortestPath(targetId) {
+    if (!nodeById(graph.rootId) || !nodeById(targetId)) return null;
+    if (targetId === graph.rootId) return {nodes:[graph.rootId],edges:[]};
+    const adj = adjacency(), queue = [graph.rootId], prev = new Map([[graph.rootId,null]]), prevEdge = new Map();
+    for (let i=0;i<queue.length;i++) {
+      const current = queue[i];
+      if (current === targetId) break;
+      for (const item of (adj.get(current) || [])) {
+        if (!prev.has(item.to)) { prev.set(item.to,current); prevEdge.set(item.to,item.id); queue.push(item.to); }
+      }
+    }
+    if (!prev.has(targetId)) return null;
+    const nodes = [], edges = []; let cursor = targetId;
+    while (cursor !== null) { nodes.push(cursor); const edgeId = prevEdge.get(cursor); if (edgeId) edges.push(edgeId); cursor = prev.get(cursor); }
+    nodes.reverse(); edges.reverse(); return {nodes,edges};
+  }
+  function allDistances() {
+    const distances = new Map();
+    for (const n of graph.nodes) { const p = shortestPath(n.id); distances.set(n.id,p ? p.edges.length : null); }
+    return distances;
+  }
+  function nameInitial(name) { return (name.trim().charAt(0) || '?').toLocaleUpperCase('ru-RU'); }
+  function placeStage() { stage.style.transform = `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`; }
+  function updateCounts() {
+    $('nodeCount').textContent = graph.nodes.length;
+    $('edgeCount').textContent = graph.edges.length;
+    const ds = allDistances();
+    const reachable = [...ds.values()].filter(v => v !== null).length;
+    const max = Math.max(0,...[...ds.values()].filter(v => v !== null));
+    $('reachableCount').textContent = reachable;
+    $('maxDistance').textContent = max;
+    $('emptyTip').style.display = graph.nodes.length > 1 ? 'none' : 'block';
+  }
+  function renderGraph() {
+    const selectedPath = selectedNodeId ? shortestPath(selectedNodeId) : null;
+    const pathNodes = new Set(selectedPath ? selectedPath.nodes : []);
+    const pathEdges = new Set(selectedPath ? selectedPath.edges : []);
+    const distances = allDistances();
+    nodeLayer.innerHTML = '';
+    for (const n of graph.nodes) {
+      const isRoot = n.id === graph.rootId;
+      const distance = distances.get(n.id);
+      const el = document.createElement('div');
+      el.className = 'node' + (isRoot?' main':'') + (n.id===selectedNodeId?' selected':'') + (pathNodes.has(n.id)?' path-node':'') + (connectFrom===n.id?' connect-start':'');
+      el.dataset.id = n.id;
+      el.style.left = n.x + 'px'; el.style.top = n.y + 'px';
+      const chip = isRoot ? 'ОСНОВНОЙ' : distance === null ? 'НЕТ СВЯЗИ' : `${distance} ${distance===1?'РУКОПОЖАТИЕ':distance>=2&&distance<=4?'РУКОПОЖАТИЯ':'РУКОПОЖАТИЙ'}`;
+      const info = isRoot ? 'Начало твоей сети' : distance === null ? 'Пока не связан с главным' : `До главного: ${distance}`;
+      el.innerHTML = `<div class="node-top"><div class="node-avatar"></div><div class="node-chip"></div></div><div class="node-name"></div><div class="node-distance"></div><button class="node-port" type="button" aria-label="Соединить с другим человеком" title="Потяни к другому человеку или нажми, затем выбери его"></button>`;
+      el.querySelector('.node-avatar').textContent = nameInitial(n.name);
+      el.querySelector('.node-chip').textContent = chip;
+      el.querySelector('.node-name').textContent = n.name;
+      el.querySelector('.node-distance').textContent = info;
+      el.addEventListener('pointerdown', (event) => onNodePointerDown(event,n.id));
+      el.querySelector('.node-port').addEventListener('pointerdown', event => startLinkDrag(event,n.id));
+      el.addEventListener('keydown', (event) => { if (event.key==='Enter' || event.key===' ') { event.preventDefault(); selectNode(n.id); } });
+      el.tabIndex = 0; el.setAttribute('role','button'); el.setAttribute('aria-label',`${n.name}, ${isRoot?'основной человек':distance===null?'нет связи':distance+' рукопожатий'}`);
+      nodeLayer.appendChild(el);
+    }
+    edgeLayer.innerHTML = '';
+    for (const e of graph.edges) {
+      const a = nodeById(e.a), b = nodeById(e.b); if (!a || !b) continue;
+      const dx=b.x-a.x, dy=b.y-a.y;
+      const curve = Math.min(38,Math.max(-38,dx*.08));
+      const d = `M ${a.x} ${a.y} C ${a.x+dx*.36+curve} ${a.y+dy*.32}, ${a.x+dx*.64+curve} ${a.y+dy*.68}, ${b.x} ${b.y}`;
+      const hit = document.createElementNS('http://www.w3.org/2000/svg','path');
+      hit.setAttribute('d',d); hit.setAttribute('class','edge-hit'+(e.id===selectedEdgeId?' selected':''));
+      hit.addEventListener('pointerdown',event=>{ event.stopPropagation(); selectEdge(e.id); });
+      const line = document.createElementNS('http://www.w3.org/2000/svg','path');
+      line.setAttribute('d',d); line.setAttribute('class','edge-line'+(pathEdges.has(e.id)?' path':'')+(e.id===selectedEdgeId?' selected':''));
+      edgeLayer.append(hit,line);
+    }
+    updateCounts();
+    renderInspector();
+  }
+  function renderInspector() {
+    const root = nodeById(graph.rootId);
+    const selected = nodeById(selectedNodeId);
+    const inspector = $('inspector');
+    if (selected) {
+      const path = shortestPath(selected.id);
+      const isRoot = selected.id === graph.rootId;
+      const distanceText = isRoot ? 'Основной человек' : path ? 'Самый короткий путь найден' : 'Пока нет связи с основным';
+      inspector.innerHTML = `
+        <div class="person-head"><div class="person-avatar">${escapeHTML(nameInitial(selected.name))}</div><div class="person-title"><strong></strong><span>${isRoot?'Точка отсчёта': 'Участник сети'}</span></div></div>
+        <label class="field-label" for="renameInput">Имя человека</label>
+        <input class="field-input" id="renameInput" maxlength="60" value="" />
+        <div class="distance-card"><div class="distance-caption">Рукопожатий до основного</div><div class="distance-number"><strong>${path ? path.edges.length : '—'}</strong><span>${path ? (path.edges.length===1?'шаг':path.edges.length>=2&&path.edges.length<=4?'шага':'шагов') : 'нет пути'}</span></div><div class="distance-note">${distanceText}</div></div>
+        ${path ? `<div class="path-box"><div class="path-title">Цепочка знакомств</div><div class="path-list">${path.nodes.map((id,i)=>`<div class="path-step"><span class="step-num">${i+1}</span><span>${escapeHTML(nodeById(id)?.name || 'Неизвестно')}</span></div>${i<path.nodes.length-1?'<div class="path-arrow">↓</div>':''}`).join('')}</div></div>` : `<div class="path-box"><div class="path-title">Цепочка знакомств</div><div class="edge-info">Добавь связь между этим человеком и кем-то из уже подключённой сети — тогда появится путь до ${escapeHTML(root?.name || 'основного человека')}.</div></div>`}
+        <div class="inspector-actions">
+          ${!isRoot?'<button class="small-action main-action" id="makeMainBtn">Сделать основным человеком</button>':''}
+          <button class="small-action" id="connectFromSelectedBtn">Создать связь</button>
+          <button class="small-action delete-action" id="deleteNodeBtn">Удалить человека</button>
+        </div>`;
+      inspector.querySelector('.person-title strong').textContent = selected.name;
+      $('renameInput').value = selected.name;
+      $('renameInput').addEventListener('change',e=>{
+        const value=e.target.value.trim(); if (!value) { e.target.value=selected.name; return; }
+        selected.name=value; saveGraph(); renderGraph(); toast('Имя обновлено');
+      });
+      if (!isRoot) $('makeMainBtn').addEventListener('click',()=>{ graph.rootId=selected.id; saveGraph(); renderGraph(); toast('Основной человек изменён'); });
+      $('connectFromSelectedBtn').addEventListener('click',()=>{ connectMode=true;connectFrom=selected.id;selectedEdgeId=null;updateConnectUI();renderGraph();toast('Теперь выбери второго человека'); });
+      $('deleteNodeBtn').addEventListener('click',()=>deleteNode(selected.id));
+    } else if (selectedEdgeId && edgeById(selectedEdgeId)) {
+      const edge=edgeById(selectedEdgeId), a=nodeById(edge.a), b=nodeById(edge.b);
+      inspector.innerHTML=`<div class="edge-info"><strong style="color:#edf1fb">Связь между людьми</strong><br>${escapeHTML(a?.name||'')} ↔ ${escapeHTML(b?.name||'')}<br><span style="color:#8994aa;font-size:9px">Линия означает, что эти два человека знакомы напрямую.</span></div><div class="inspector-actions"><button class="small-action delete-action" id="deleteEdgeBtn">Удалить связь</button></div>`;
+      $('deleteEdgeBtn').addEventListener('click',()=>{ graph.edges=graph.edges.filter(e=>e.id!==selectedEdgeId);selectedEdgeId=null;saveGraph();renderGraph();toast('Связь удалена'); });
+    } else {
+      inspector.innerHTML='<div class="empty-inspector"><div class="target">◎</div><div><strong>Выбери человека</strong><p>Нажми на блок на поле, чтобы посмотреть расстояние до основного человека и кратчайшую цепочку знакомств.</p></div></div>';
+    }
+  }
+  function escapeHTML(value) { return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function selectNode(id) { selectedNodeId=id;selectedEdgeId=null;renderGraph(); }
+  function selectEdge(id) { selectedEdgeId=id;selectedNodeId=null;renderGraph(); }
+  function onNodePointerDown(event,id) {
+    event.stopPropagation();
+    if (event.button !== 0) return;
+    if (connectMode) { handleConnectClick(id); return; }
+    selectedNodeId=id; selectedEdgeId=null;
+    drag={id,pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,originX:nodeById(id).x,originY:nodeById(id).y,moved:false};
+    renderGraph();
+  }
+  function createConnection(fromId,toId) {
+    if (!fromId || !toId || fromId===toId) { toast('Выбери другого человека'); return false; }
+    const exists=graph.edges.some(e=>(e.a===fromId&&e.b===toId)||(e.a===toId&&e.b===fromId));
+    if (exists) { toast('Эти люди уже соединены'); return false; }
+    graph.edges.push({id:makeId(),a:fromId,b:toId});
+    connectMode=false;connectFrom=null;selectedNodeId=toId;selectedEdgeId=null;
+    saveGraph();updateConnectUI();renderGraph();toast('Связь добавлена');
+    return true;
+  }
+  function handleConnectClick(id) {
+    if (!connectFrom) { connectFrom=id; selectedNodeId=id; selectedEdgeId=null; updateConnectUI(); renderGraph(); toast('Теперь выбери второго человека'); return; }
+    createConnection(connectFrom,id);
+  }
+  function startLinkDrag(event,fromId) {
+    event.preventDefault();event.stopPropagation();
+    if (event.button!==0) return;
+    linkDrag={from:fromId,pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,x:event.clientX,y:event.clientY,moved:false};
+    try { event.target.setPointerCapture(event.pointerId); } catch {}
+    selectedNodeId=fromId;selectedEdgeId=null;
+    nodeLayer.querySelectorAll('.node').forEach(el=>el.classList.toggle('selected',el.dataset.id===fromId));
+    renderInspector();
+    drawEdgesOnly();
+  }
+  function finishLinkDrag(event) {
+    if (!linkDrag || event.pointerId!==linkDrag.pointerId) return;
+    const state=linkDrag;linkDrag=null;
+    const hit=document.elementFromPoint(event.clientX,event.clientY);
+    const targetEl=hit?.closest?.('.node');
+    const targetId=targetEl?.dataset?.id;
+    nodeLayer.querySelectorAll('.drop-target').forEach(el=>el.classList.remove('drop-target'));
+    if (state.moved && targetId && targetId!==state.from) {
+      createConnection(state.from,targetId);
+    } else if (!state.moved) {
+      connectMode=true;connectFrom=state.from;selectedNodeId=state.from;selectedEdgeId=null;
+      updateConnectUI();renderGraph();toast('Теперь нажми на второго человека');
+    } else {
+      drawEdgesOnly();toast('Отпусти точку на карточке другого человека');
+    }
+  }
+  function updateConnectUI() {
+    canvas.classList.toggle('connecting',connectMode);
+    $('connectBtn').classList.toggle('active',connectMode);
+    $('connectBtn').innerHTML = connectMode
+      ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg> Отменить соединение'
+      : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="m8.2 8.2 7.6 7.6"/></svg> Соединить людей';
+    $('connectBanner').textContent=connectFrom ? `Выбран: ${nodeById(connectFrom)?.name || 'человек'} · выбери второго` : 'Выбери первого человека для связи';
+  }
+  function addNode(name) {
+    const rect=canvas.getBoundingClientRect();
+    let x=(rect.width/2-pan.x)/zoom, y=(rect.height/2-pan.y)/zoom;
+    const angle=graph.nodes.length*2.399, radius=145+Math.sqrt(graph.nodes.length)*34;
+    x += Math.cos(angle)*radius; y += Math.sin(angle)*radius;
+    x=Math.max(100,Math.min(WORLD_W-100,x)); y=Math.max(100,Math.min(WORLD_H-100,y));
+    const node={id:makeId(),name:name.trim(),x,y}; graph.nodes.push(node);selectedNodeId=node.id;selectedEdgeId=null;
+    saveGraph();renderGraph();centerOn(node);toast('Человек добавлен');
+  }
+  function deleteNode(id) {
+    const n=nodeById(id); if (!n) return;
+    if (!confirm(`Удалить «${n.name}» и все его связи?`)) return;
+    graph.nodes=graph.nodes.filter(x=>x.id!==id);graph.edges=graph.edges.filter(e=>e.a!==id&&e.b!==id);
+    if (graph.rootId===id) graph.rootId=graph.nodes[0]?.id || null;
+    if (!graph.nodes.length) { graph=defaultGraph(); }
+    selectedNodeId=null;selectedEdgeId=null;saveGraph();renderGraph();toast('Человек удалён');
+  }
+  function centerOn(node) {
+    if (!node) return;
+    const rect=canvas.getBoundingClientRect(); pan.x=rect.width/2-node.x*zoom;pan.y=rect.height/2-node.y*zoom;placeStage();
+  }
+  function fitGraph() {
+    if (!graph.nodes.length) return;
+    const rect=canvas.getBoundingClientRect();
+    const xs=graph.nodes.map(n=>n.x),ys=graph.nodes.map(n=>n.y);
+    const minX=Math.min(...xs)-130,maxX=Math.max(...xs)+130,minY=Math.min(...ys)-100,maxY=Math.max(...ys)+100;
+    const w=Math.max(260,maxX-minX),h=Math.max(200,maxY-minY);
+    zoom=Math.max(.35,Math.min(1.35,Math.min((rect.width-100)/w,(rect.height-100)/h)));
+    pan.x=(rect.width-(minX+maxX)*zoom)/2;pan.y=(rect.height-(minY+maxY)*zoom)/2;
+    placeStage();updateZoomLabel();
+  }
+  function updateZoomLabel() { $('zoomValue').textContent=Math.round(zoom*100)+'%'; }
+  function setZoom(next,screenX,screenY) {
+    const old=zoom; next=Math.max(.35,Math.min(2.2,next)); if (next===old) return;
+    const rect=canvas.getBoundingClientRect();
+    const px=screenX ?? rect.width/2, py=screenY ?? rect.height/2;
+    const worldX=(px-pan.x)/old, worldY=(py-pan.y)/old;
+    zoom=next;pan.x=px-worldX*zoom;pan.y=py-worldY*zoom;placeStage();updateZoomLabel();
+  }
+  function findPerson(query) {
+    const q=query.trim().toLocaleLowerCase('ru-RU'); if (!q) return;
+    const found=graph.nodes.find(n=>n.name.toLocaleLowerCase('ru-RU').includes(q));
+    if (found) { selectNode(found.id);centerOn(found); } else toast('Человек не найден');
+  }
+  function exportJSON() {
+    const blob=new Blob([JSON.stringify({...graph,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='MatildaNet-network.json';a.click();URL.revokeObjectURL(url);toast('Файл сети экспортирован');
+  }
+  function importJSON(file) {
+    const reader=new FileReader();
+    reader.onload=()=>{
+      try {
+        const data=JSON.parse(reader.result);
+        if (!data || !Array.isArray(data.nodes) || !Array.isArray(data.edges)) throw new Error('bad');
+        const nodes=data.nodes.filter(n=>n&&typeof n.name==='string').map(n=>({id:String(n.id||makeId()),name:n.name.slice(0,60),x:Number.isFinite(n.x)?Math.max(50,Math.min(WORLD_W-50,n.x)):WORLD_W/2,y:Number.isFinite(n.y)?Math.max(50,Math.min(WORLD_H-50,n.y)):WORLD_H/2}));
+        if (!nodes.length) throw new Error('empty');
+        const ids=new Set(nodes.map(n=>n.id));
+        const edges=data.edges.filter(e=>e&&ids.has(String(e.a))&&ids.has(String(e.b))&&String(e.a)!==String(e.b)).map(e=>({id:String(e.id||makeId()),a:String(e.a),b:String(e.b)}));
+        graph={title:typeof data.title==='string'?data.title:'Моя сеть рукопожатий',rootId:ids.has(String(data.rootId))?String(data.rootId):nodes[0].id,nodes,edges};
+        $('graphTitle').value=graph.title;selectedNodeId=null;selectedEdgeId=null;connectMode=false;connectFrom=null;updateConnectUI();saveGraph();renderGraph();fitGraph();toast('Сеть импортирована');
+      } catch { toast('Не удалось прочитать файл сети'); }
+    };
+    reader.readAsText(file);
+  }
+
+  $('graphTitle').value=graph.title;
+  $('graphTitle').addEventListener('change',e=>{graph.title=e.target.value.trim()||'Моя сеть рукопожатий';e.target.value=graph.title;saveGraph();});
+  $('addNodeBtn').addEventListener('click',()=>{ $('addModal').classList.add('open');$('personName').value='';setTimeout(()=>$('personName').focus(),50); });
+  $('cancelAdd').addEventListener('click',()=> $('addModal').classList.remove('open'));
+  $('addModal').addEventListener('pointerdown',e=>{if(e.target===$('addModal'))$('addModal').classList.remove('open');});
+  $('addForm').addEventListener('submit',e=>{e.preventDefault();const name=$('personName').value.trim();if(!name)return;$('addModal').classList.remove('open');addNode(name);});
+  $('connectBtn').addEventListener('click',()=>{connectMode=!connectMode;connectFrom=null;selectedEdgeId=null;updateConnectUI();renderGraph();if(connectMode)toast('Нажми на двух людей по очереди или потяни точку на карточке');});
+  $('centerBtn').addEventListener('click',fitGraph);
+  $('fitBtn').addEventListener('click',fitGraph);
+  $('zoomIn').addEventListener('click',()=>setZoom(zoom*1.2));
+  $('zoomOut').addEventListener('click',()=>setZoom(zoom/1.2));
+  $('exportBtn').addEventListener('click',exportJSON);
+  $('importBtn').addEventListener('click',()=>$('importFile').click());
+  $('importFile').addEventListener('change',e=>{if(e.target.files[0])importJSON(e.target.files[0]);e.target.value='';});
+  $('resetBtn').addEventListener('click',()=>{if(!confirm('Удалить текущую сеть и начать заново?'))return;graph=defaultGraph();selectedNodeId=null;selectedEdgeId=null;connectMode=false;connectFrom=null;$('graphTitle').value=graph.title;saveGraph();updateConnectUI();renderGraph();fitGraph();toast('Создана новая сеть');});
+  $('searchInput').addEventListener('keydown',e=>{if(e.key==='Enter'){findPerson(e.target.value);e.target.blur();}});
+
+  canvas.addEventListener('pointerdown',event=>{
+    if (event.target.closest('.node') || event.target.closest('.edge-hit') || event.target.closest('.canvas-controls')) return;
+    if (connectMode) { connectMode=false;connectFrom=null;updateConnectUI();renderGraph();return; }
+    selectedNodeId=null;selectedEdgeId=null;renderGraph();
+    if (event.button===0) { panDrag={pointerId:event.pointerId,lastX:event.clientX,lastY:event.clientY};canvas.classList.add('panning'); }
+  });
+  window.addEventListener('pointermove',event=>{
+    if (linkDrag && event.pointerId===linkDrag.pointerId) {
+      const state=linkDrag;state.x=event.clientX;state.y=event.clientY;
+      if (Math.hypot(event.clientX-state.startX,event.clientY-state.startY)>7) state.moved=true;
+      const hit=document.elementFromPoint(event.clientX,event.clientY);
+      const target=hit?.closest?.('.node');
+      nodeLayer.querySelectorAll('.drop-target').forEach(el=>{if(el!==target)el.classList.remove('drop-target');});
+      if (target && target.dataset.id!==state.from) target.classList.add('drop-target');
+      drawEdgesOnly();
+    } else if (drag && event.pointerId===drag.pointerId) {
+      const dx=(event.clientX-drag.startX)/zoom,dy=(event.clientY-drag.startY)/zoom;
+      if (Math.abs(dx)+Math.abs(dy)>2) drag.moved=true;
+      const n=nodeById(drag.id); if (!n)return;
+      n.x=Math.max(60,Math.min(WORLD_W-60,drag.originX+dx));n.y=Math.max(60,Math.min(WORLD_H-60,drag.originY+dy));
+      const el=nodeLayer.querySelector(`[data-id="${CSS.escape(drag.id)}"]`);if(el){el.style.left=n.x+'px';el.style.top=n.y+'px';}
+      // Redraw the connection paths while the block is moving.
+      drawEdgesOnly();
+    } else if (panDrag && event.pointerId===panDrag.pointerId) {
+      pan.x+=event.clientX-panDrag.lastX;pan.y+=event.clientY-panDrag.lastY;panDrag.lastX=event.clientX;panDrag.lastY=event.clientY;placeStage();
+    }
+  });
+  window.addEventListener('pointerup',event=>{
+    if (linkDrag && event.pointerId===linkDrag.pointerId) { finishLinkDrag(event); }
+    if (drag && event.pointerId===drag.pointerId) { if(drag.moved)saveGraph();drag=null; }
+    if (panDrag && event.pointerId===panDrag.pointerId) {panDrag=null;canvas.classList.remove('panning');}
+  });
+  function drawEdgesOnly() {
+    const path=selectedNodeId?shortestPath(selectedNodeId):null;const pathEdges=new Set(path?path.edges:[]);
+    edgeLayer.innerHTML='';
+    for(const e of graph.edges){const a=nodeById(e.a),b=nodeById(e.b);if(!a||!b)continue;const dx=b.x-a.x,dy=b.y-a.y,curve=Math.min(38,Math.max(-38,dx*.08));const d=`M ${a.x} ${a.y} C ${a.x+dx*.36+curve} ${a.y+dy*.32}, ${a.x+dx*.64+curve} ${a.y+dy*.68}, ${b.x} ${b.y}`;const hit=document.createElementNS('http://www.w3.org/2000/svg','path');hit.setAttribute('d',d);hit.setAttribute('class','edge-hit'+(e.id===selectedEdgeId?' selected':''));hit.addEventListener('pointerdown',ev=>{ev.stopPropagation();selectEdge(e.id);});const line=document.createElementNS('http://www.w3.org/2000/svg','path');line.setAttribute('d',d);line.setAttribute('class','edge-line'+(pathEdges.has(e.id)?' path':'')+(e.id===selectedEdgeId?' selected':''));edgeLayer.append(hit,line);}
+    if(linkDrag && linkDrag.moved){
+      const a=nodeById(linkDrag.from);const rect=canvas.getBoundingClientRect();
+      if(a){const x=(linkDrag.x-rect.left-pan.x)/zoom,y=(linkDrag.y-rect.top-pan.y)/zoom;
+        const sourceEl=nodeLayer.querySelector(`[data-id="${CSS.escape(linkDrag.from)}"]`);
+        const startX=a.x+(sourceEl?sourceEl.offsetWidth/2:95),startY=a.y;const dx=x-startX,dy=y-startY,curve=Math.min(38,Math.max(-38,dx*.08));
+        const preview=document.createElementNS('http://www.w3.org/2000/svg','path');
+        preview.setAttribute('d',`M ${startX} ${startY} C ${startX+dx*.36+curve} ${startY+dy*.32}, ${startX+dx*.64+curve} ${startY+dy*.68}, ${x} ${y}`);
+        preview.setAttribute('class','link-preview');edgeLayer.append(preview);
+      }
+    }
+  }
+  canvas.addEventListener('wheel',event=>{event.preventDefault();const rect=canvas.getBoundingClientRect();setZoom(zoom*(event.deltaY<0?1.1:1/1.1),event.clientX-rect.left,event.clientY-rect.top);},{passive:false});
+  window.addEventListener('keydown',event=>{
+    if(event.key==='Escape'){if(linkDrag){linkDrag=null;drawEdgesOnly();}if(connectMode){connectMode=false;connectFrom=null;updateConnectUI();renderGraph();}else $('addModal').classList.remove('open');}
+    const active=document.activeElement;const typing=active&&(active.tagName==='INPUT'||active.tagName==='TEXTAREA');
+    if(!typing&&(event.key==='Delete'||event.key==='Backspace')){if(selectedNodeId)deleteNode(selectedNodeId);else if(selectedEdgeId){graph.edges=graph.edges.filter(e=>e.id!==selectedEdgeId);selectedEdgeId=null;saveGraph();renderGraph();}}
+    if(!typing&&(event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='s'){event.preventDefault();saveGraph();toast('Сеть сохранена в браузере');}
+  });
+  window.addEventListener('resize',()=>{ /* Keep the current camera position; the canvas remains movable. */ });
+
+  placeStage();updateZoomLabel();updateConnectUI();renderGraph();
+  requestAnimationFrame(()=>{if(graph.nodes.length===1&&graph.nodes[0].id==='root')centerOn(graph.nodes[0]);else fitGraph();});
+})();
+</script>
+</body>
+</html>
