@@ -85,7 +85,7 @@
       background-image:radial-gradient(rgba(142,157,190,.19) .8px, transparent .8px); background-size:24px 24px; }
     .canvas-area.connecting { cursor:crosshair; }
     .canvas-area.panning { cursor:grabbing; }
-    .stage { position:absolute; left:0; top:0; width:4000px; height:3000px; transform-origin:0 0; will-change:transform; }
+    .stage { position:absolute; left:0; top:0; width:4000px; height:3000px; zoom:1; }
     .edge-layer { position:absolute; inset:0; width:4000px; height:3000px; overflow:visible; }
     .edge-line { fill:none; stroke:rgba(141,157,190,.5); stroke-width:2.2; pointer-events:none; transition:stroke .15s, stroke-width .15s; }
     .edge-line.path { stroke:#a78bfa; stroke-width:3.3; filter:drop-shadow(0 0 5px rgba(167,139,250,.45)); }
@@ -492,7 +492,14 @@
     return distances;
   }
   function nameInitial(name) { return (name.trim().charAt(0) || '?').toLocaleUpperCase('ru-RU'); }
-  function placeStage() { stage.style.transform = `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`; }
+  function placeStage() {
+    // Use layout zoom instead of transform:scale(). Chromium can keep transformed
+    // layers as low-resolution bitmaps; CSS zoom relayouts the cards at the new
+    // scale so text, borders and shadows stay sharp after every zoom step.
+    stage.style.zoom = String(zoom);
+    stage.style.left = (pan.x / zoom) + 'px';
+    stage.style.top = (pan.y / zoom) + 'px';
+  }
   function updateCounts() {
     $('nodeCount').textContent = graph.nodes.length;
     $('edgeCount').textContent = graph.edges.length;
